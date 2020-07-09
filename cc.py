@@ -8,6 +8,12 @@ from json.decoder import JSONDecodeError
 
 @contextmanager
 def open_file(filename, mode="r"):
+    """
+    File Open Procedure
+    :param filename: full file path
+    :param mode: r = read, w = write
+    :return: either error or file
+    """
     try:
         f = open(filename, mode, encoding='utf-8')
     except IOError as err:
@@ -20,11 +26,16 @@ def open_file(filename, mode="r"):
 
 
 def main():
-    with open_file("config.list", "r") as (f, err):
+    """
+    Main program
+    """
+    # Read settings into cl
+    with open_file("file.list", "r") as (f, err):
         if err:
             print(f"Error:{err}")
         else:
             cl = [line.rstrip('\n') for line in f]
+    # Read DB with configuration file information into db
     with open_file("db.json", "r") as (f, err):
         if err:
             print(f"Error:{err}")
@@ -33,14 +44,21 @@ def main():
                 db = json.load(f)
             except JSONDecodeError as e:
                 pass  # db.json is empty?
+    # Check if any files have changed
     list_config_files = []
     for x in cl:
-        config_file = {'file': x, 'size': os.path.getsize(x), 'mtime': os.path.getmtime(x)}
+        # Getting file information
+        config_file = {'file': x,
+                       'size': os.path.getsize(x),
+                       'mtime': os.path.getmtime(x),
+                       'atime': os.path.getatime(x),
+                       'ctime': os.path.getctime(x)}
         # print(x)
         # file_size = os.path.getsize(x)
         # print(file_size)
         # print(config_file)
 
+        # md5 calculation
         with open_file(x) as (f, err):
             if err:
                 print(f"Error:{err}")
@@ -55,6 +73,7 @@ def main():
         print(config_file)
         list_config_files.append(config_file)
 
+    # Write DB with configuration file information
     with open_file("db.json", "w") as (f, err):
         if err:
             print(f"Error:{err}")
