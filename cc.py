@@ -2,11 +2,12 @@
 import json
 import os
 import hashlib
-import settings
 import logging
 import traceback
 from contextlib import contextmanager
 from json.decoder import JSONDecodeError
+from settings import conf, DEBUG
+
 
 error_text = ""
 error_count = 0
@@ -36,40 +37,40 @@ def get_logger():
     :return: logger
     """
     # Get log level
-    if settings.DEBUG:
+    if DEBUG:
         print("get_logger()")
-    if settings.DEBUG:
+    if DEBUG:
         log_level = logging.DEBUG
     else:
         log_level = logging.INFO
-    if settings.DEBUG:
+    if DEBUG:
         print(f"log_level={log_level}")
     # Get folder for logging
-    if settings.log_dir:
-        log_dir = settings.log_path
+    if conf['log_dir']:
+        log_dir = conf['log_path']
     else:
         log_dir = os.path.join(os.path.dirname(__file__), 'log')
-    if settings.DEBUG:
+    if DEBUG:
         print(f"log_dir={log_dir}")
     # If folder for loggin does not exist, create it.
     if not os.path.exists(log_dir):
         try:
             os.mkdir(log_dir)
-            if settings.DEBUG:
+            if DEBUG:
                 print(f"Directory {log_dir} created")
         except OSError:
             print(f"CRITICAL ERROR: Creation of the directory {log_dir} failed")
             print(traceback.format_exc())
             exit(1)
     # Get log file name
-    if settings.log_name:
-        log_name = settings.log_name
+    if conf['log_name']:
+        log_name = conf['log_name']
     else:
         log_name = "cc.log"
-    if settings.DEBUG:
+    if DEBUG:
         print(f"log_name={log_name}")
     log_file = os.path.join(log_dir, log_name)
-    if settings.DEBUG:
+    if DEBUG:
         print(f"log_file={log_file}")
     log_formatter = logging.Formatter('%(asctime)s|%(levelname)8s| %(message)s')
     handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
@@ -122,7 +123,7 @@ def main():
                 logger.debug(f"db:{db}")
             except JSONDecodeError as e:
                 pass  # db.json is empty?
-    # Check if any files have changed
+    # Getting file information and Check if any files have changed
     logger.debug("Getting file information and Check if any files have changed")
     list_config_files = []
     for x in cl:
@@ -130,9 +131,7 @@ def main():
         logger.debug("Getting file information")
         config_file = {'file': x,
                        'size': os.path.getsize(x),
-                       'mtime': os.path.getmtime(x),
-                       'atime': os.path.getatime(x),
-                       'ctime': os.path.getctime(x)}
+                       'mtime': os.path.getmtime(x)}
         logger.debug(f"config_file={config_file}")
         if settings.md5:
             # md5 calculation
@@ -151,6 +150,8 @@ def main():
                         logger.error(f"ERROR: I can't md5 {e}")
             logger.debug(f"config_file={config_file}")
         list_config_files.append(config_file)
+    # Check the file have changed (path, size, mtime default)
+
 
     # Write DB with configuration file information
     with open_file("db.json", "w") as (f, err):
