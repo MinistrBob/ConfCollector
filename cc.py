@@ -6,39 +6,15 @@ import logging
 import traceback
 from contextlib import contextmanager
 from json.decoder import JSONDecodeError
+from shutil import copy
 from settings import conf, DEBUG
-
 
 error_text = ""
 error_count = 0
 
-@contextmanager
-def open_file(filename, mode="r"):
-    """
-    File Open Procedure
-    :param filename: full file path
-    :param mode: r = read, w = write
-    :return: either error or file
-    """
-    try:
-        f = open(filename, mode, encoding='utf-8')
-    except IOError as err:
-        yield None, err
-    else:
-        try:
-            yield f, None
-        finally:
-            f.close()
-
-
-def get_logger():
-    """
-    Get logger.
-    :return: logger
-    """
+try:
+    # Get logger.
     # Get log level
-    if DEBUG:
-        print("get_logger()")
     if DEBUG:
         log_level = logging.DEBUG
     else:
@@ -75,23 +51,59 @@ def get_logger():
     log_formatter = logging.Formatter('%(asctime)s|%(levelname)8s| %(message)s')
     handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
     handler.setFormatter(log_formatter)
-    custom_logger = logging.getLogger()
-    custom_logger.setLevel(log_level)
-    custom_logger.addHandler(handler)
-    # print(custom_logger.handlers[0].baseFilename)
-    return custom_logger
+    logger = logging.getLogger()
+    logger.setLevel(log_level)
+    logger.addHandler(handler)
+except:
+    print(f"CRITICAL ERROR: get_logger()")
+    print(traceback.format_exc())
+    exit(1)
+
+
+@contextmanager
+def open_file(filename, mode="r"):
+    """
+    File Open Procedure
+    :param filename: full file path
+    :param mode: r = read, w = write
+    :return: either error or file
+    """
+    try:
+        f = open(filename, mode, encoding='utf-8')
+    except IOError as err:
+        yield None, err
+    else:
+        try:
+            yield f, None
+        finally:
+            f.close()
+
+
+def copy_file(file):
+    try:
+        copy(file, conf['repository']['path'])
+    except Exception as err:
+        print(f"Error: Can't copy file from {file} to {conf['repository']['path']}\n{err}")
+        logger.error(f"Error: Can't get file information\n{err}")
+
+
+def push_to_git():
+    pass
+
+
+def send_file_to_repository(file):
+    if conf['repository']['type'] == "storage":
+        copy_file(file)
+    elif conf['repository']['type'] == "git":
+        copy_file(file)
+        push_to_git()
 
 
 def main():
     """
     Main program
     """
-    try:
-        logger = get_logger()
-    except:
-        print(f"CRITICAL ERROR: get_logger()")
-        print(traceback.format_exc())
-        exit(1)
+    logger.info("-" * 120)
     logger.info("CC START")
     # Read list of monitored files (file.list) into cl
     logger.debug("Read list of monitored files (file.list) into cl")
@@ -125,15 +137,18 @@ def main():
                 pass  # db.json is empty?
     # Getting file information and Check if any files have changed
     logger.debug("Getting file information and Check if any files have changed")
-    list_config_files = []
+    dict_config_files = {}
     for x in cl:
         # Getting file information
         logger.debug("Getting file information")
-        config_file = {'file': x,
-                       'size': os.path.getsize(x),
-                       'mtime': os.path.getmtime(x)}
+        try:
+            config_file = {'size': os.path.getsize(x),
+                           'mtime': os.path.getmtime(x)}
+        except Exception as err:
+            print(f"Error: Can't get file information\n{err}")
+            logger.error(f"Error: Can't get file information\n{err}")
         logger.debug(f"config_file={config_file}")
-        if settings.md5:
+        if conf['md5']:
             # md5 calculation
             logger.debug("md5 calculation")
             with open_file(x) as (f, err):
@@ -149,9 +164,20 @@ def main():
                     except Exception as e:
                         logger.error(f"ERROR: I can't md5 {e}")
             logger.debug(f"config_file={config_file}")
-        list_config_files.append(config_file)
-    # Check the file have changed (path, size, mtime default)
-
+        dict_config_files[x] = config_file
+        # Check the file have changed (path, size, mtime default)
+        if x in db:
+            if conf['md5']:
+                if dict_config_files[x]['md5'] != db[x]['md5']:
+                    logger.debug("md5 did not match, copy to repository")
+                    send_file_to_repository(x)
+            else:
+                if dict_config_files[x]['size'] != db[x]['size']:
+                    logger.debug("size did not match, copy to repository")
+                    send_file_to_repository(x)
+                if dict_config_files[x]['mtime'] != db[x]['mtime']:
+                    logger.debug("mtime did not match, copy to repository")
+                    send_file_to_repository(x)
 
     # Write DB with configuration file information
     with open_file("db.json", "w") as (f, err):
@@ -160,7 +186,7 @@ def main():
             logger.error(f"Error:{err}")
         else:
             try:
-                f.write(json.dumps(list_config_files, indent=4))
+                f.write(json.dumps(dict_config_files, indent=4))
                 logger.debug("File db.json write ok")
             except Exception as e:
                 logger.error(f"ERROR: Dump JSON: {e}")
@@ -168,6 +194,10 @@ def main():
 
 
 if __name__ == "__main__":
+    # Check setting
+    if not conf['repository']['path']:
+        print(f"CRITICAL ERROR: Storage path (conf['repository']['path']) not defined")
+        exit(1)
     main()
     if error_text:
         pass
