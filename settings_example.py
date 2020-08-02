@@ -1,10 +1,24 @@
-# DEBUG mod on\off
-DEBUG = True
+import os
+# DEBUG mod on\off (determined by an environment variable DEBUG)
+DEBUG = (os.getenv("DEBUG") == 'True')
 
 conf = dict(
     md5=True,  # Whether to calculate and check the md5.
     log_dir="",  # Directory for logging. Not set by default. Logging to the folder where the program is running + \log.
     log_name="cc.log",  # Name log file.
+    # Repository types:
+    #     'storage' - file storate (folder on disk);
+    #     'git' - git repository (in fact, it is also a folder on disk, but also only push to a remote repository)
+    repository={
+        'type': 'storage',
+        'path': r"c:\MyGit\ConfigCollector\test\repos",
+        'fos': True  # whether to create a folder structure in storage
+    },
+    # repository={
+    #     'type': 'git',
+    #     'path': r"c:\MyGit\ConfigCollector\test\repos",
+    #     'fos': True  # whether to create a folder structure in storage
+    # },
     admin_emails=['xxx@gmail.com']  # email addresses to which notifications will be sent
 )
 

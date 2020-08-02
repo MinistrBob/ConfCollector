@@ -31,7 +31,7 @@ try:
     # If folder for loggin does not exist, create it.
     if not os.path.exists(log_dir):
         try:
-            os.mkdir(log_dir)
+            os.makedirs(log_dir)
             if DEBUG:
                 print(f"Directory {log_dir} created")
         except OSError:
@@ -81,7 +81,24 @@ def open_file(filename, mode="r"):
 
 def copy_file(file):
     try:
-        copy(file, conf['repository']['path'])
+        if conf['repository']['fos']:
+            extra_path = os.path.dirname(file)
+            if ":" in extra_path:
+                extra_path = extra_path.replace(":", "")
+            dst = os.path.join(conf['repository']['path'], extra_path)
+            if not os.path.exists(dst):
+                try:
+                    os.makedirs(dst)
+                    if DEBUG:
+                        print(f"Directory {dst} created")
+                except OSError:
+                    print(f"CRITICAL ERROR: Creation of the directory {dst} failed")
+                    print(traceback.format_exc())
+                    exit(1)
+        else:
+            dst = conf['repository']['path']
+        logger.info(f"Copy file:\n{file} to\n{dst}")
+        copy(file, dst)
     except Exception as err:
         print(f"Error: Can't copy file from {file} to {conf['repository']['path']}\n{err}")
         logger.error(f"Error: Can't get file information\n{err}")
